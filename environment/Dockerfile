@@ -30,7 +30,7 @@ RUN export CPLUS_INCLUDE_PATH=/opt/boost_1_72_p/include && cd /tmp && \
     CC=clang-10 CXX=clang++-10 \
         /opt/get_symengine.sh fbd501264a86b7452ec35bb0370fbabc6d83b5c6 /opt/symengine-fbd5012-tcm Release -DWITH_BFD=OFF -DWITH_TCMALLOC=ON && \
     export CXXFLAGS="$CXXFLAGS -stdlib=libc++ -I/opt/libcxx10_msan/include -I/opt/libcxx10_msan/include/c++/v1 -fno-omit-frame-pointer -fno-optimize-sibling-calls -O1 -glldb -DHAVE_GCC_ABI_DEMANGLE=no" && \
-    export LDFLAGS="-fsanitize=memory $LDFLAGS -Wl,-rpath,/opt/libcxx10_msan/lib -L/opt/libcxx10_msan/lib -lc++abi"
+    export LDFLAGS="-fsanitize=memory $LDFLAGS -Wl,-rpath,/opt/libcxx10_msan/lib -L/opt/libcxx10_msan/lib -lc++abi" && \
     CC=clang-10 CXX=clang++-10 \
         /opt/get_symengine.sh fbd501264a86b7452ec35bb0370fbabc6d83b5c6 /opt/symengine-fbd5012-msan Debug -DWITH_BFD=OFF -DWITH_SYMENGINE_RCP=ON -DINTEGER_CLASS=boostmp
 
