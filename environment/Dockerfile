@@ -40,7 +40,10 @@ RUN \
     apt-get --quiet --assume-yes --no-install-recommends install wkhtmltopdf && \
     apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
-
+RUN \
+    sed -i 's/rights="none"/rights="read | write"/g' /etc/ImageMagick-6/policy.xml && \
+    strip --remove-section=.note.ABI-tag /usr/lib/x86_64-linux-gnu/libQt5Core.so.5 && echo stackoverflow.com/questions/54582864/ >/dev/null && \
+    wkhtmltopdf --help >/dev/null
 
 
 
