@@ -20,19 +20,31 @@ RUN \
     rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
 COPY scripts/get_symengine.sh /opt/
-RUN export CPLUS_INCLUDE_PATH=/opt/boost_1_72_p/include && cd /tmp && \
-    curl -Ls "https://vorboss.dl.sourceforge.net/project/swig/swig/swig-4.0.1/swig-4.0.1.tar.gz" | tar xz && cd swig-* && ./configure && make && make install && \
+RUN \
+    CC=clang-10 CXX=clang++-10 CXXFLAGS="-std=c++14" \
+        /opt/get_symengine.sh fbd501264a86b7452ec35bb0370fbabc6d83b5c6 /opt/symengine-fbd5012-rel Release -DWITH_CPP14=ON -DWITH_COTIRE=OFF -DWITH_BFD=OFF -DWITH_LLVM=ON && \
+    CC=clang-10 CXX=clang++-10 CXXFLAGS="-std=c++14" \
+        /opt/get_symengine.sh fbd501264a86b7452ec35bb0370fbabc6d83b5c6 /opt/symengine-fbd5012-tcm Release -DWITH_CPP14=ON -DWITH_COTIRE=OFF -DWITH_BFD=OFF -DWITH_LLVM=ON -DWITH_TCMALLOC=ON && \
     export CMAKE_PREFIX_PATH=/usr/lib/llvm-10 && \
-    CC=gcc-10   CXX=g++-10 CXXFLAGS="-D_GLIBCXX_DEBUG -D_GLIBCXX_DEBUG_PEDANTIC -fsized-deallocation" \
-        /opt/get_symengine.sh fbd501264a86b7452ec35bb0370fbabc6d83b5c6 /opt/symengine-fbd5012-dbg Debug   -DWITH_BFD=OFF  -DINTEGER_CLASS=boostmp && \
+    export CPLUS_INCLUDE_PATH=/opt/boost_1_72_p/include && cd /tmp && \
+    CC=gcc-10   CXX=g++-10 CXXFLAGS="-std=c++14 -D_GLIBCXX_DEBUG -D_GLIBCXX_DEBUG_PEDANTIC -fsized-deallocation" \
+        /opt/get_symengine.sh fbd501264a86b7452ec35bb0370fbabc6d83b5c6 /opt/symengine-fbd5012-dbg Debug   -DWITH_CPP14=ON -DWITH_COTIRE=OFF -DWITH_BFD=OFF  -DINTEGER_CLASS=boostmp && \
     CC=clang-10 CXX=clang++-10 \
-        /opt/get_symengine.sh fbd501264a86b7452ec35bb0370fbabc6d83b5c6 /opt/symengine-fbd5012-rel Release -DWITH_BFD=OFF && \
-    CC=clang-10 CXX=clang++-10 \
-        /opt/get_symengine.sh fbd501264a86b7452ec35bb0370fbabc6d83b5c6 /opt/symengine-fbd5012-tcm Release -DWITH_BFD=OFF -DWITH_TCMALLOC=ON && \
-    export CXXFLAGS="$CXXFLAGS -stdlib=libc++ -I/opt/libcxx10_msan/include -I/opt/libcxx10_msan/include/c++/v1 -fno-omit-frame-pointer -fno-optimize-sibling-calls -O1 -glldb -DHAVE_GCC_ABI_DEMANGLE=no" && \
-    export LDFLAGS="-fsanitize=memory $LDFLAGS -Wl,-rpath,/opt/libcxx10_msan/lib -L/opt/libcxx10_msan/lib -lc++abi" && \
-    CC=clang-10 CXX=clang++-10 \
-        /opt/get_symengine.sh fbd501264a86b7452ec35bb0370fbabc6d83b5c6 /opt/symengine-fbd5012-msan Debug -DWITH_BFD=OFF -DWITH_SYMENGINE_RCP=ON -DINTEGER_CLASS=boostmp
+    CXXFLAGS="-std=c++14 $CXXFLAGS -stdlib=libc++ -I/opt/libcxx10_msan/include -I/opt/libcxx10_msan/include/c++/v1 -fno-omit-frame-pointer -fno-optimize-sibling-calls -O1 -glldb -DHAVE_GCC_ABI_DEMANGLE=no" \
+    LDFLAGS="-fsanitize=memory $LDFLAGS -Wl,-rpath,/opt/libcxx10_msan/lib -L/opt/libcxx10_msan/lib -lc++abi" \
+        /opt/get_symengine.sh fbd501264a86b7452ec35bb0370fbabc6d83b5c6 /opt/symengine-fbd5012-msan Debug -DWITH_CPP14=ON -DWITH_COTIRE=OFF -DWITH_BFD=OFF -DWITH_SYMENGINE_RCP=ON -DINTEGER_CLASS=boostmp && \
+    curl -Ls "https://vorboss.dl.sourceforge.net/project/swig/swig/swig-4.0.1/swig-4.0.1.tar.gz" | tar xz && cd swig-* && ./configure && make && make install
+
+RUN \
+    apt-get update && \
+    apt-get --quiet --assume-yes --no-install-recommends install wkhtmltopdf && \
+    apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+
+
+
+
+
+
 
 # RUN \
 #     curl -LOs https://github.com/python/cpython/archive/v3.8.2.tar.gz && \
