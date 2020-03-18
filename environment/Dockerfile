@@ -4,13 +4,19 @@ MAINTAINER Björn Dahlgren <bjodah@DELETEMEgmail.com>
 RUN \
     export CC=clang-10 CXX=clang++-10 && \
     export LLVM_ORG_VER=10.0.0-rc3 && \
+    export LLVM_MAJOR=$(echo $LLVM_ORG_VER | cut -f1 -d.) && \
     curl -Ls https://github.com/llvm/llvm-project/archive/llvmorg-${LLVM_ORG_VER}.tar.gz | tar xz -C /tmp && \
-    mkdir /tmp/build_libcxx && cd /tmp/build_libcxx && cmake -DCMAKE_BUILD_TYPE=Release -DLLVM_USE_SANITIZER=MemoryWithOrigins \
-      -DLLVM_CONFIG_PATH=/usr/bin/llvm-config-10 \
-      -DCMAKE_INSTALL_PREFIX=/opt/libcxx10_msan /tmp/llvm-project-llvmorg-${LLVM_ORG_VER}/libcxx && make install && cd - && \
-    mkdir /tmp/build_libcxxabi && cd /tmp/build_libcxxabi && cmake -DCMAKE_BUILD_TYPE=Release -DLLVM_USE_SANITIZER=MemoryWithOrigins \
-      -DLIBCXXABI_LIBCXX_INCLUDES=/opt/libcxx10_msan/include/c++/v1 -DLLVM_CONFIG_PATH=/usr/bin/llvm-config-10 -DLIBCXXABI_LIBCXX_PATH=/tmp/llvm-project-llvmorg-${LLVM_ORG_VER}/libcxx \
-      -DCMAKE_INSTALL_PREFIX=/opt/libcxx10_msan /tmp/llvm-project-llvmorg-${LLVM_ORG_VER}/libcxxabi && make install && cd - && \
+    mkdir /tmp/build_libcxx && \
+    cd /tmp/build_libcxx && \
+    cmake -DCMAKE_BUILD_TYPE=Release -DLLVM_USE_SANITIZER=MemoryWithOrigins -DLLVM_CONFIG_PATH=/usr/bin/llvm-config-$LLVM_MAJOR -DCMAKE_INSTALL_PREFIX=/opt/libcxx${LLVM_MAJOR}_msan /tmp/llvm-project-llvmorg-${LLVM_ORG_VER}/libcxx && \
+    cmake --build . && \
+    cmake --build . --target install && \
+    mkdir /tmp/build_libcxxabi &&  \
+    cd /tmp/build_libcxxabi &&  \
+    cmake -DCMAKE_BUILD_TYPE=Release -DLLVM_USE_SANITIZER=MemoryWithOrigins -DLLVM_CONFIG_PATH=/usr/bin/llvm-config-${LLVM_MAJOR} -DCMAKE_INSTALL_PREFIX=/opt/libcxx${LLVM_MAJOR}_msan -DLIBCXXABI_LIBCXX_INCLUDES=/opt/libcxx${LLVM_MAJOR}_msan/include/c++/v1 -DLIBCXXABI_LIBCXX_PATH=/tmp/llvm-project-llvmorg-${LLVM_ORG_VER}/libcxx  /tmp/llvm-project-llvmorg-${LLVM_ORG_VER}/libcxxabi &&  \
+    cmake --build .  && \
+    cmake --build . --target install && \
+    cp /tmp/llvm-project-llvmorg-${LLVM_ORG_VER}/libcxxabi/include/* /opt/libcxx${LLVM_MAJOR}_msan/include/ && \
     rm -r /tmp/build_* /tmp/llvm-project*
 
 
@@ -44,8 +50,6 @@ RUN \
     sed -i 's/rights="none"/rights="read | write"/g' /etc/ImageMagick-6/policy.xml && \
     strip --remove-section=.note.ABI-tag /usr/lib/x86_64-linux-gnu/libQt5Core.so.5 && echo stackoverflow.com/questions/54582864/ >/dev/null && \
     wkhtmltopdf --help >/dev/null
-
-
 
 
 
