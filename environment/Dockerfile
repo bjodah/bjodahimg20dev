@@ -2,8 +2,9 @@ FROM bjodah/bjodahimg20:v1.0
 MAINTAINER Björn Dahlgren <bjodah@DELETEMEgmail.com>
 
 RUN \
+    apt-get update && apt-get dist-upgrade -y && \
     export CC=clang-10 CXX=clang++-10 && \
-    export LLVM_ORG_VER=10.0.0-rc3 && \
+    export LLVM_ORG_VER=10.0.0-rc4 && \
     export LLVM_MAJOR=$(echo $LLVM_ORG_VER | cut -f1 -d.) && \
     curl -Ls https://github.com/llvm/llvm-project/archive/llvmorg-${LLVM_ORG_VER}.tar.gz | tar xz -C /tmp && \
     mkdir /tmp/build_libcxx && \
@@ -28,17 +29,18 @@ RUN \
 COPY scripts/get_symengine.sh /opt/
 RUN \
     CC=clang-10 CXX=clang++-10 CXXFLAGS="-std=c++14" \
-        /opt/get_symengine.sh fbd501264a86b7452ec35bb0370fbabc6d83b5c6 /opt/symengine-fbd5012-rel Release -DWITH_CPP14=ON -DWITH_COTIRE=OFF -DWITH_BFD=OFF -DWITH_LLVM=ON && \
+        /opt/get_symengine.sh 403c076f1ddba0db02820f832a668b8e6a436d97 /opt/symengine-403c076-rel Release -DWITH_CPP14=ON -DWITH_COTIRE=OFF -DWITH_BFD=OFF -DWITH_LLVM=ON && \
     CC=clang-10 CXX=clang++-10 CXXFLAGS="-std=c++14" \
-        /opt/get_symengine.sh fbd501264a86b7452ec35bb0370fbabc6d83b5c6 /opt/symengine-fbd5012-tcm Release -DWITH_CPP14=ON -DWITH_COTIRE=OFF -DWITH_BFD=OFF -DWITH_LLVM=ON -DWITH_TCMALLOC=ON && \
+        /opt/get_symengine.sh 403c076f1ddba0db02820f832a668b8e6a436d97 /opt/symengine-403c076-tcm Release -DWITH_CPP14=ON -DWITH_COTIRE=OFF -DWITH_BFD=OFF -DWITH_LLVM=ON -DWITH_TCMALLOC=ON && \
     export CMAKE_PREFIX_PATH=/usr/lib/llvm-10 && \
     export CPLUS_INCLUDE_PATH=/opt/boost_1_72_p/include && cd /tmp && \
     CC=gcc-10   CXX=g++-10 CXXFLAGS="-std=c++14 -D_GLIBCXX_DEBUG -D_GLIBCXX_DEBUG_PEDANTIC -fsized-deallocation" \
-        /opt/get_symengine.sh fbd501264a86b7452ec35bb0370fbabc6d83b5c6 /opt/symengine-fbd5012-dbg Debug   -DWITH_CPP14=ON -DWITH_COTIRE=OFF -DWITH_BFD=OFF  -DINTEGER_CLASS=boostmp && \
-    CC=clang-10 CXX=clang++-10 \
+        /opt/get_symengine.sh 403c076f1ddba0db02820f832a668b8e6a436d97 /opt/symengine-403c076-dbg Debug   -DWITH_CPP14=ON -DWITH_COTIRE=OFF -DWITH_BFD=OFF -DWITH_LLVM=OFF -DINTEGER_CLASS=boostmp
+
+RUN CC=clang-10 CXX=clang++-10 \
     CXXFLAGS="-std=c++14 $CXXFLAGS -stdlib=libc++ -I/opt/libcxx10_msan/include -I/opt/libcxx10_msan/include/c++/v1 -fno-omit-frame-pointer -fno-optimize-sibling-calls -O1 -glldb -DHAVE_GCC_ABI_DEMANGLE=no" \
     LDFLAGS="-fsanitize=memory $LDFLAGS -Wl,-rpath,/opt/libcxx10_msan/lib -L/opt/libcxx10_msan/lib -lc++abi" \
-        /opt/get_symengine.sh fbd501264a86b7452ec35bb0370fbabc6d83b5c6 /opt/symengine-fbd5012-msan Debug -DWITH_CPP14=ON -DWITH_COTIRE=OFF -DWITH_BFD=OFF -DWITH_SYMENGINE_RCP=ON -DINTEGER_CLASS=boostmp && \
+        /opt/get_symengine.sh 403c076f1ddba0db02820f832a668b8e6a436d97 /opt/symengine-403c076-msan Debug -DWITH_CPP14=ON -DWITH_COTIRE=OFF -DWITH_BFD=OFF -DWITH_SYMENGINE_RCP=ON -DINTEGER_CLASS=boostmp && \
     curl -Ls "https://vorboss.dl.sourceforge.net/project/swig/swig/swig-4.0.1/swig-4.0.1.tar.gz" | tar xz && cd swig-* && ./configure && make && make install
 
 RUN \
@@ -94,7 +96,7 @@ RUN \
 
 
 # RUN \
-#     curl -Ls "https://julialang-s3.julialang.org/bin/linux/x64/1.2/julia-1.4.0-linux-x86_64.tar.gz" | tar xz -C /opt && \
+#     curl -Ls "https://julialang-s3.julialang.org/bin/linux/x64/1.4/julia-1.4.0-linux-x86_64.tar.gz" | tar xz -C /opt && \
 #     PATH=/opt/julia-1.4.0/bin:$PATH julia -e 'using Pkg; \
 #       Pkg.add("DifferentialEquations"); using DifferentialEquations; \
 #       pkg"add https://github.com/JuliaDiffEq/DiffEqTutorials.jl"; using DiffEqTutorials; \

@@ -30,6 +30,6 @@ fi
 TMP_BLD_DIR=$(mktemp -d); trap "{ rm -r $TMP_BLD_DIR; }" INT TERM EXIT
 cd $TMP_BLD_DIR
 cmake -DBUILD_SHARED_LIBS=ON -DBUILD_TESTS=ON -DBUILD_BENCHMARKS=OFF -DCMAKE_INSTALL_PREFIX=$2 -DCMAKE_BUILD_TYPE=$3 "${@:4}" "$SRCDIR"
-make
+make -j $(nproc)
 ctest --output-on-failure --exclude-regex "(test_bipartite)|(test_hopcroft_karp)"  # https://github.com/symengine/symengine/pull/1543
 make install
