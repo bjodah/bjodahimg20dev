@@ -22,8 +22,9 @@ RUN \
 
 
 COPY scripts/get_sundials.sh /opt/
+# -fsanitize-memory-track-origins=2
 RUN \
-    CC=clang-10 CFLAGS="-fsanitize=memory -fsanitize-memory-track-origins=2 -fno-omit-frame-pointer -fno-optimize-sibling-calls -O1" /opt/get_sundials.sh 5.1.0 /opt/sundials-5.1.0-msan -DLAPACK_ENABLE=OFF -DKLU_ENABLE=OFF -DSUNDIALS_INDEX_SIZE=32 && \
+    CC=clang-10 CFLAGS="-fsanitize=memory -fno-omit-frame-pointer -fno-optimize-sibling-calls -O1" /opt/get_sundials.sh 5.1.0 /opt/sundials-5.1.0-msan -DLAPACK_ENABLE=OFF -DKLU_ENABLE=OFF -DSUNDIALS_INDEX_SIZE=32 && \
     rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
 COPY scripts/get_symengine.sh /opt/
@@ -38,12 +39,13 @@ RUN \
         /opt/get_symengine.sh 403c076f1ddba0db02820f832a668b8e6a436d97 /opt/symengine-403c076-dbg Debug   -DWITH_CPP14=ON -DWITH_COTIRE=OFF -DWITH_BFD=OFF -DWITH_LLVM=OFF -DINTEGER_CLASS=boostmp
 
 RUN CC=clang-10 CXX=clang++-10 \
-    CXXFLAGS="-std=c++14 $CXXFLAGS -stdlib=libc++ -I/opt/libcxx10_msan/include -I/opt/libcxx10_msan/include/c++/v1 -fno-omit-frame-pointer -fno-optimize-sibling-calls -O1 -glldb -DHAVE_GCC_ABI_DEMANGLE=no" \
+    CXXFLAGS="-std=c++14 $CXXFLAGS -fsanitize=memory -stdlib=libc++ -I/opt/libcxx10_msan/include -I/opt/libcxx10_msan/include/c++/v1 -fno-omit-frame-pointer -fno-optimize-sibling-calls -O1 -glldb -DHAVE_GCC_ABI_DEMANGLE=no" \
     LDFLAGS="-fsanitize=memory $LDFLAGS -Wl,-rpath,/opt/libcxx10_msan/lib -L/opt/libcxx10_msan/lib -lc++abi" \
-        /opt/get_symengine.sh 403c076f1ddba0db02820f832a668b8e6a436d97 /opt/symengine-403c076-msan Debug -DWITH_CPP14=ON -DWITH_COTIRE=OFF -DWITH_BFD=OFF -DWITH_SYMENGINE_RCP=ON -DINTEGER_CLASS=boostmp && \
-    curl -Ls "https://vorboss.dl.sourceforge.net/project/swig/swig/swig-4.0.1/swig-4.0.1.tar.gz" | tar xz && cd swig-* && ./configure && make && make install
+        /opt/get_symengine.sh 403c076f1ddba0db02820f832a668b8e6a436d97 /opt/symengine-403c076-msan Debug -DWITH_CPP14=ON -DWITH_COTIRE=OFF -DWITH_BFD=OFF -DWITH_SYMENGINE_RCP=ON -DINTEGER_CLASS=boostmp \
+        -DBOOST_ROOT=/opt/boost_1_72_p
 
 RUN \
+    curl -Ls "https://vorboss.dl.sourceforge.net/project/swig/swig/swig-4.0.1/swig-4.0.1.tar.gz" | tar xz && cd swig-* && ./configure && make && make install && \
     apt-get update && \
     apt-get --quiet --assume-yes --no-install-recommends install wkhtmltopdf && \
     apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
