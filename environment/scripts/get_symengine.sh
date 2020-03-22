@@ -27,10 +27,9 @@ if [ ! -d $SRCDIR ]; then
         exit 1
     fi
 fi
-sed -i 's/-march=native//' $SRCDIR/cmake/UserOverride.cmake  # https://github.com/symengine/symengine/issues/1542
 TMP_BLD_DIR=$(mktemp -d); trap "{ rm -r $TMP_BLD_DIR; }" INT TERM EXIT
 cd $TMP_BLD_DIR
-cmake -DBUILD_SHARED_LIBS=ON -DBUILD_TESTS=OFF -DBUILD_BENCHMARKS=OFF -DCMAKE_INSTALL_PREFIX=$2 -DCMAKE_BUILD_TYPE=$3 "${@:4}" "$SRCDIR"
+cmake -DBUILD_SHARED_LIBS=ON -DBUILD_TESTS=ON -DBUILD_BENCHMARKS=OFF -DCMAKE_INSTALL_PREFIX=$2 -DCMAKE_BUILD_TYPE=$3 "${@:4}" "$SRCDIR"
 make
 ctest --output-on-failure --exclude-regex "(test_bipartite)|(test_hopcroft_karp)"  # https://github.com/symengine/symengine/pull/1543
 make install
