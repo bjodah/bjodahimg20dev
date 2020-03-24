@@ -47,7 +47,7 @@ RUN CC=clang-10 CXX=clang++-10 \
 RUN \
     curl -Ls "https://vorboss.dl.sourceforge.net/project/swig/swig/swig-4.0.1/swig-4.0.1.tar.gz" | tar xz && cd swig-* && ./configure && make && make install && \
     apt-get update && \
-    apt-get --quiet --assume-yes --no-install-recommends install wkhtmltopdf && \
+    apt-get --quiet --assume-yes --no-install-recommends install wkhtmltopdf python2-dev && \
     apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
 RUN \
