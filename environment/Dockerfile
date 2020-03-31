@@ -55,7 +55,17 @@ RUN \
     strip --remove-section=.note.ABI-tag /usr/lib/x86_64-linux-gnu/libQt5Core.so.5 && echo stackoverflow.com/questions/54582864/ >/dev/null && \
     wkhtmltopdf --help >/dev/null
 
+COPY scripts/get_sundials-5.2.0.sh /opt/
+RUN \
+    CC=clang-10 CFLAGS="-fsanitize=memory -fno-omit-frame-pointer -fno-optimize-sibling-calls -O1" /opt/get_sundials-5.2.0.sh 5.2.0 /opt/sundials-5.2.0-msan -DLAPACK_ENABLE=OFF -DKLU_ENABLE=OFF -DSUNDIALS_INDEX_SIZE=32 && \
+    CC=gcc-10 /opt/get_sundials-5.2.0.sh 5.2.0 /opt/sundials-5.2.0-klu-lapack -DLAPACK_ENABLE=ON -DKLU_ENABLE=ON -DKLU_INCLUDE_DIR=/usr/include/suitesparse -DKLU_LIBRARY_DIR=/usr/lib/x86_64-linux-gnu -DSUNDIALS_INDEX_SIZE=32 && \
+    CC=gcc-10 /opt/get_sundials-5.2.0.sh 5.2.0 /opt/sundials-5.2.0-noklu-nolapack-extended-int64 -DLAPACK_ENABLE=OFF -DKLU_ENABLE=OFF -DSUNDIALS_PRECISION:STRING="extended" -DSUNDIALS_INDEX_SIZE=64 && \
+    CC=gcc-10 /opt/get_sundials-5.2.0.sh 5.2.0 /opt/sundials-5.2.0-noklu-nolapack-single-int32 -DLAPACK_ENABLE=OFF -DKLU_ENABLE=OFF -DSUNDIALS_PRECISION:STRING="single" -DSUNDIALS_INDEX_SIZE=32
 
+RUN \
+    apt-get update && apt-get dist-upgrade -y && \
+    apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+   
 
 # RUN \
 #     curl -LOs https://github.com/python/cpython/archive/v3.8.2.tar.gz && \
