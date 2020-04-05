@@ -1,10 +1,10 @@
-FROM bjodah/bjodahimg20:v1.0
+FROM bjodah/bjodahimg20:v1.1
 MAINTAINER Björn Dahlgren <bjodah@DELETEMEgmail.com>
 
 RUN \
     apt-get update && apt-get dist-upgrade -y && \
     export CC=clang-10 CXX=clang++-10 && \
-    export LLVM_ORG_VER=10.0.0-rc4 && \
+    export LLVM_ORG_VER=10.0.0 && \
     export LLVM_MAJOR=$(echo $LLVM_ORG_VER | cut -f1 -d.) && \
     curl -Ls https://github.com/llvm/llvm-project/archive/llvmorg-${LLVM_ORG_VER}.tar.gz | tar xz -C /tmp && \
     mkdir /tmp/build_libcxx && \
@@ -30,25 +30,22 @@ RUN \
 COPY scripts/get_symengine.sh /opt/
 RUN \
     CC=clang-10 CXX=clang++-10 CXXFLAGS="-std=c++14" \
-        /opt/get_symengine.sh 403c076f1ddba0db02820f832a668b8e6a436d97 /opt/symengine-403c076-rel Release -DWITH_CPP14=ON -DWITH_COTIRE=OFF -DWITH_BFD=OFF -DWITH_LLVM=ON && \
+        /opt/get_symengine.sh 3c274630c70c242442c051d3db3fe96cf156be2d /opt/symengine-3c27463-rel Release -DWITH_CPP14=ON -DWITH_COTIRE=OFF -DWITH_BFD=OFF -DWITH_LLVM=ON && \
     CC=clang-10 CXX=clang++-10 CXXFLAGS="-std=c++14" \
-        /opt/get_symengine.sh 403c076f1ddba0db02820f832a668b8e6a436d97 /opt/symengine-403c076-tcm Release -DWITH_CPP14=ON -DWITH_COTIRE=OFF -DWITH_BFD=OFF -DWITH_LLVM=ON -DWITH_TCMALLOC=ON && \
+        /opt/get_symengine.sh 3c274630c70c242442c051d3db3fe96cf156be2d /opt/symengine-3c27463-tcm Release -DWITH_CPP14=ON -DWITH_COTIRE=OFF -DWITH_BFD=OFF -DWITH_LLVM=ON -DWITH_TCMALLOC=ON && \
     export CMAKE_PREFIX_PATH=/usr/lib/llvm-10 && \
     export CPLUS_INCLUDE_PATH=/opt/boost_1_72_p/include && cd /tmp && \
     CC=gcc-10   CXX=g++-10 CXXFLAGS="-std=c++14 -D_GLIBCXX_DEBUG -D_GLIBCXX_DEBUG_PEDANTIC -fsized-deallocation" \
-        /opt/get_symengine.sh 403c076f1ddba0db02820f832a668b8e6a436d97 /opt/symengine-403c076-dbg Debug   -DWITH_CPP14=ON -DWITH_COTIRE=OFF -DWITH_BFD=OFF -DWITH_LLVM=OFF -DINTEGER_CLASS=boostmp
+        /opt/get_symengine.sh 3c274630c70c242442c051d3db3fe96cf156be2d /opt/symengine-3c27463-dbg Debug   -DWITH_CPP14=ON -DWITH_COTIRE=OFF -DWITH_BFD=OFF -DWITH_LLVM=OFF -DINTEGER_CLASS=boostmp
 
 RUN CC=clang-10 CXX=clang++-10 \
     CXXFLAGS="-std=c++14 $CXXFLAGS -fsanitize=memory -stdlib=libc++ -I/opt/libcxx10_msan/include -I/opt/libcxx10_msan/include/c++/v1 -fno-omit-frame-pointer -fno-optimize-sibling-calls -O1 -glldb -DHAVE_GCC_ABI_DEMANGLE=no" \
     LDFLAGS="-fsanitize=memory $LDFLAGS -Wl,-rpath,/opt/libcxx10_msan/lib -L/opt/libcxx10_msan/lib -lc++abi" \
-        /opt/get_symengine.sh 403c076f1ddba0db02820f832a668b8e6a436d97 /opt/symengine-403c076-msan Debug -DWITH_CPP14=ON -DWITH_COTIRE=OFF -DWITH_BFD=OFF -DWITH_SYMENGINE_RCP=ON -DINTEGER_CLASS=boostmp \
+        /opt/get_symengine.sh 3c274630c70c242442c051d3db3fe96cf156be2d /opt/symengine-3c27463-msan Debug -DWITH_CPP14=ON -DWITH_COTIRE=OFF -DWITH_BFD=OFF -DWITH_SYMENGINE_RCP=ON -DINTEGER_CLASS=boostmp \
         -DBOOST_ROOT=/opt/boost_1_72_p
 
 RUN \
-    curl -Ls "https://vorboss.dl.sourceforge.net/project/swig/swig/swig-4.0.1/swig-4.0.1.tar.gz" | tar xz && cd swig-* && ./configure && make && make install && \
-    apt-get update && \
-    apt-get --quiet --assume-yes --no-install-recommends install wkhtmltopdf python2-dev && \
-    apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+    curl -Ls "https://vorboss.dl.sourceforge.net/project/swig/swig/swig-4.0.1/swig-4.0.1.tar.gz" | tar xz && cd swig-* && CXX=g++-10 CC=gcc-10 ./configure && make && make install
 
 RUN \
     sed -i 's/rights="none"/rights="read | write"/g' /etc/ImageMagick-6/policy.xml && \
@@ -57,14 +54,18 @@ RUN \
 
 COPY scripts/get_sundials-5.2.0.sh /opt/
 RUN \
-    CC=clang-10 CFLAGS="-fsanitize=memory -fno-omit-frame-pointer -fno-optimize-sibling-calls -O1" /opt/get_sundials-5.2.0.sh 5.2.0 /opt/sundials-5.2.0-msan -DLAPACK_ENABLE=OFF -DKLU_ENABLE=OFF -DSUNDIALS_INDEX_SIZE=32 && \
-    CC=gcc-10 /opt/get_sundials-5.2.0.sh 5.2.0 /opt/sundials-5.2.0-klu-lapack -DLAPACK_ENABLE=ON -DKLU_ENABLE=ON -DKLU_INCLUDE_DIR=/usr/include/suitesparse -DKLU_LIBRARY_DIR=/usr/lib/x86_64-linux-gnu -DSUNDIALS_INDEX_SIZE=32 && \
-    CC=gcc-10 /opt/get_sundials-5.2.0.sh 5.2.0 /opt/sundials-5.2.0-noklu-nolapack-extended-int64 -DLAPACK_ENABLE=OFF -DKLU_ENABLE=OFF -DSUNDIALS_PRECISION:STRING="extended" -DSUNDIALS_INDEX_SIZE=64 && \
-    CC=gcc-10 /opt/get_sundials-5.2.0.sh 5.2.0 /opt/sundials-5.2.0-noklu-nolapack-single-int32 -DLAPACK_ENABLE=OFF -DKLU_ENABLE=OFF -DSUNDIALS_PRECISION:STRING="single" -DSUNDIALS_INDEX_SIZE=32
+    CC=clang-10 CFLAGS="-fsanitize=memory -fno-omit-frame-pointer -fno-optimize-sibling-calls -O1" /opt/get_sundials-5.2.0.sh 5.2.0 /opt/sundials-5.2.0-msan -DLAPACK_ENABLE=OFF -DKLU_ENABLE=OFF -DSUNDIALS_INDEX_SIZE=32
 
-RUN \
-    apt-get update && apt-get dist-upgrade -y && \
-    apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+# COPY scripts/get_sundials-5.3.0.sh /opt/
+# RUN \
+#     CC=clang-10 CFLAGS="-fsanitize=memory -fno-omit-frame-pointer -fno-optimize-sibling-calls -O1" /opt/get_sundials-5.3.0.sh 5.3.0 /opt/sundials-5.3.0-msan -DLAPACK_ENABLE=OFF -DKLU_ENABLE=OFF -DSUNDIALS_INDEX_SIZE=32 && \
+#     CC=gcc-10 /opt/get_sundials-5.3.0.sh 5.3.0 /opt/sundials-5.3.0-klu-lapack -DLAPACK_ENABLE=ON -DKLU_ENABLE=ON -DKLU_INCLUDE_DIR=/usr/include/suitesparse -DKLU_LIBRARY_DIR=/usr/lib/x86_64-linux-gnu -DSUNDIALS_INDEX_SIZE=32 && \
+#     CC=gcc-10 /opt/get_sundials-5.3.0.sh 5.3.0 /opt/sundials-5.3.0-noklu-nolapack-extended-int64 -DLAPACK_ENABLE=OFF -DKLU_ENABLE=OFF -DSUNDIALS_PRECISION:STRING="extended" -DSUNDIALS_INDEX_SIZE=64 && \
+#     CC=gcc-10 /opt/get_sundials-5.3.0.sh 5.3.0 /opt/sundials-5.3.0-noklu-nolapack-single-int32 -DLAPACK_ENABLE=OFF -DKLU_ENABLE=OFF -DSUNDIALS_PRECISION:STRING="single" -DSUNDIALS_INDEX_SIZE=32
+
+# RUN \
+#     apt-get update && apt-get dist-upgrade -y && \
+#     apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
    
 
 # RUN \
@@ -89,9 +90,9 @@ RUN \
 #     rm -rf /tmp/* /var/tmp/* ~/.cache/pip
 
 
- #tar xzf v3.8.2.tar.gz && \
- #cd cpython-3.8.2 && \
- #CC=clang-10 CFLAGS="-Og" ./configure --prefix=/opt/cpython-3.8m-msan --enable-loadable-sqlite-extensions --with-memory-sanitizer --enable-shared --with-ensurepip=yes LDFLAGS=-Wl,-rpath=/opt/cpython-3.8-msan/lib && \
+# tar xzf v3.8.2.tar.gz && \
+# cd cpython-3.8.2 && \
+# CC=clang-10 CFLAGS="-Og" ./configure --prefix=/opt/cpython-3.8m-msan --enable-loadable-sqlite-extensions --with-memory-sanitizer --enable-shared --with-ensurepip=yes LDFLAGS=-Wl,-rpath=/opt/cpython-3.8-msan/lib && \
     
 
 
@@ -128,11 +129,11 @@ RUN \
 #       DiffEqTutorials.weave_folder("type_handling"); \
 #       '
 
-    # ~/.julia/conda/3/bin/pip install jupyter_contrib_nbextensions && \
-    # PATH=/opt/julia-1.4.0/bin:$PATH julia -e 'using Pkg; \
-    #   Pkg.add("WebIO"); using WebIO; \
-    #   Pkg.add("ORCA"); using ORCA; \
-    #   Pkg.add("PloylyJS"); using PlotlyJS; \
+# ~/.julia/conda/3/bin/pip install jupyter_contrib_nbextensions && \
+# PATH=/opt/julia-1.4.0/bin:$PATH julia -e 'using Pkg; \
+#   Pkg.add("WebIO"); using WebIO; \
+#   Pkg.add("ORCA"); using ORCA; \
+#   Pkg.add("PloylyJS"); using PlotlyJS; \
 
 #RUN \
 #    cd /tmp && curl -LOs http://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/cuda-repo-ubuntu2004_10.1.168-1_amd64.deb && \
