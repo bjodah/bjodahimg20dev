@@ -1,10 +1,9 @@
-FROM bjodah/bjodahimg20:v1.1
+FROM bjodah/bjodahimg20:v1.2
 MAINTAINER Björn Dahlgren <bjodah@DELETEMEgmail.com>
 
 RUN \
-    apt-get update && apt-get dist-upgrade -y && \
     export CC=clang-10 CXX=clang++-10 && \
-    export LLVM_ORG_VER=10.0.0 && \
+    export LLVM_ORG_VER=10.0.1-rc1 && \
     export LLVM_MAJOR=$(echo $LLVM_ORG_VER | cut -f1 -d.) && \
     curl -Ls https://github.com/llvm/llvm-project/archive/llvmorg-${LLVM_ORG_VER}.tar.gz | tar xz -C /tmp && \
     mkdir /tmp/build_libcxx && \
@@ -24,25 +23,25 @@ RUN \
 COPY scripts/get_sundials.sh /opt/
 # -fsanitize-memory-track-origins=2
 RUN \
-    CC=clang-10 CFLAGS="-fsanitize=memory -fno-omit-frame-pointer -fno-optimize-sibling-calls -O1" /opt/get_sundials.sh 5.1.0 /opt/sundials-5.1.0-msan -DLAPACK_ENABLE=OFF -DKLU_ENABLE=OFF -DSUNDIALS_INDEX_SIZE=32 && \
+    CC=clang-10 CFLAGS="-fsanitize=memory -fno-omit-frame-pointer -fno-optimize-sibling-calls -O1" /opt/get_sundials.sh 5.3.0 /opt/sundials-5.3.0-msan -DLAPACK_ENABLE=OFF -DKLU_ENABLE=OFF -DSUNDIALS_INDEX_SIZE=32 && \
     rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
 COPY scripts/get_symengine.sh /opt/
 RUN \
     CC=clang-10 CXX=clang++-10 CXXFLAGS="-std=c++14" \
-        /opt/get_symengine.sh 3c274630c70c242442c051d3db3fe96cf156be2d /opt/symengine-3c27463-rel Release -DWITH_CPP14=ON -DWITH_COTIRE=OFF -DWITH_BFD=OFF -DWITH_LLVM=ON && \
+        /opt/get_symengine.sh 0179ce2f1b4cbcc8e0940555446d49f78c54f762 /opt/symengine-0179ce2-rel Release -DWITH_CPP14=ON -DWITH_COTIRE=OFF -DWITH_BFD=OFF -DWITH_LLVM=ON && \
     CC=clang-10 CXX=clang++-10 CXXFLAGS="-std=c++14" \
-        /opt/get_symengine.sh 3c274630c70c242442c051d3db3fe96cf156be2d /opt/symengine-3c27463-tcm Release -DWITH_CPP14=ON -DWITH_COTIRE=OFF -DWITH_BFD=OFF -DWITH_LLVM=ON -DWITH_TCMALLOC=ON && \
+        /opt/get_symengine.sh 0179ce2f1b4cbcc8e0940555446d49f78c54f762 /opt/symengine-0179ce2-tcm Release -DWITH_CPP14=ON -DWITH_COTIRE=OFF -DWITH_BFD=OFF -DWITH_LLVM=ON -DWITH_TCMALLOC=ON && \
     export CMAKE_PREFIX_PATH=/usr/lib/llvm-10 && \
-    export CPLUS_INCLUDE_PATH=/opt/boost_1_72_p/include && cd /tmp && \
+    export CPLUS_INCLUDE_PATH=/opt/boost_1_73_p/include && cd /tmp && \
     CC=gcc-10   CXX=g++-10 CXXFLAGS="-std=c++14 -D_GLIBCXX_DEBUG -D_GLIBCXX_DEBUG_PEDANTIC -fsized-deallocation" \
-        /opt/get_symengine.sh 3c274630c70c242442c051d3db3fe96cf156be2d /opt/symengine-3c27463-dbg Debug   -DWITH_CPP14=ON -DWITH_COTIRE=OFF -DWITH_BFD=OFF -DWITH_LLVM=OFF -DINTEGER_CLASS=boostmp
+        /opt/get_symengine.sh 0179ce2f1b4cbcc8e0940555446d49f78c54f762 /opt/symengine-0179ce2-dbg Debug   -DWITH_CPP14=ON -DWITH_COTIRE=OFF -DWITH_BFD=OFF -DWITH_LLVM=OFF -DINTEGER_CLASS=boostmp
 
 RUN CC=clang-10 CXX=clang++-10 \
     CXXFLAGS="-std=c++14 $CXXFLAGS -fsanitize=memory -stdlib=libc++ -I/opt/libcxx10_msan/include -I/opt/libcxx10_msan/include/c++/v1 -fno-omit-frame-pointer -fno-optimize-sibling-calls -O1 -glldb -DHAVE_GCC_ABI_DEMANGLE=no" \
     LDFLAGS="-fsanitize=memory $LDFLAGS -Wl,-rpath,/opt/libcxx10_msan/lib -L/opt/libcxx10_msan/lib -lc++abi" \
-        /opt/get_symengine.sh 3c274630c70c242442c051d3db3fe96cf156be2d /opt/symengine-3c27463-msan Debug -DWITH_CPP14=ON -DWITH_COTIRE=OFF -DWITH_BFD=OFF -DWITH_SYMENGINE_RCP=ON -DINTEGER_CLASS=boostmp \
-        -DBOOST_ROOT=/opt/boost_1_72_p
+        /opt/get_symengine.sh 0179ce2f1b4cbcc8e0940555446d49f78c54f762 /opt/symengine-0179ce2-msan Debug -DWITH_CPP14=ON -DWITH_COTIRE=OFF -DWITH_BFD=OFF -DWITH_SYMENGINE_RCP=ON -DINTEGER_CLASS=boostmp \
+        -DBOOST_ROOT=/opt/boost_1_73_p
 
 RUN \
     curl -Ls "https://vorboss.dl.sourceforge.net/project/swig/swig/swig-4.0.1/swig-4.0.1.tar.gz" | tar xz && cd swig-* && CXX=g++-10 CC=gcc-10 ./configure && make && make install
@@ -52,9 +51,11 @@ RUN \
     strip --remove-section=.note.ABI-tag /usr/lib/x86_64-linux-gnu/libQt5Core.so.5 && echo stackoverflow.com/questions/54582864/ >/dev/null && \
     wkhtmltopdf --help >/dev/null
 
-COPY scripts/get_sundials-5.2.0.sh /opt/
 RUN \
-    CC=clang-10 CFLAGS="-fsanitize=memory -fno-omit-frame-pointer -fno-optimize-sibling-calls -O1" /opt/get_sundials-5.2.0.sh 5.2.0 /opt/sundials-5.2.0-msan -DLAPACK_ENABLE=OFF -DKLU_ENABLE=OFF -DSUNDIALS_INDEX_SIZE=32
+    apt-get update && apt-get dist-upgrade -y && \
+    apt-get --quiet --assume-yes --no-install-recommends install emacs auctex && \
+    apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+
 
 # COPY scripts/get_sundials-5.3.0.sh /opt/
 # RUN \
