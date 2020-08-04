@@ -23,7 +23,7 @@ RUN \
 COPY scripts/get_sundials.sh /opt/
 # -fsanitize-memory-track-origins=2
 RUN \
-    CC=clang-10 CFLAGS="-fsanitize=memory -fno-omit-frame-pointer -fno-optimize-sibling-calls -O1" /opt/get_sundials.sh 5.3.0 /opt/sundials-5.3.0-msan -DLAPACK_ENABLE=OFF -DKLU_ENABLE=OFF -DSUNDIALS_INDEX_SIZE=32 && \
+    CC=clang-10 CFLAGS="-fsanitize=memory -fsanitize-memory-track-origins=2 -fno-omit-frame-pointer -fno-optimize-sibling-calls -O1" /opt/get_sundials.sh 5.3.0 /opt/sundials-5.3.0-msan -DLAPACK_ENABLE=OFF -DKLU_ENABLE=OFF -DSUNDIALS_INDEX_SIZE=32 && \
     rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
 COPY scripts/get_symengine.sh /opt/
@@ -38,8 +38,8 @@ RUN \
         /opt/get_symengine.sh 0179ce2f1b4cbcc8e0940555446d49f78c54f762 /opt/symengine-0179ce2-dbg Debug   -DWITH_CPP14=ON -DWITH_COTIRE=OFF -DWITH_BFD=OFF -DWITH_LLVM=OFF -DINTEGER_CLASS=boostmp
 
 RUN CC=clang-10 CXX=clang++-10 \
-    CXXFLAGS="-std=c++14 $CXXFLAGS -fsanitize=memory -stdlib=libc++ -I/opt/libcxx10_msan/include -I/opt/libcxx10_msan/include/c++/v1 -fno-omit-frame-pointer -fno-optimize-sibling-calls -O1 -glldb -DHAVE_GCC_ABI_DEMANGLE=no" \
-    LDFLAGS="-fsanitize=memory $LDFLAGS -Wl,-rpath,/opt/libcxx10_msan/lib -L/opt/libcxx10_msan/lib -lc++abi" \
+    CXXFLAGS="-std=c++14 $CXXFLAGS -fsanitize=memory -fsanitize-memory-track-origins=2 -stdlib=libc++ -I/opt/libcxx10_msan/include -I/opt/libcxx10_msan/include/c++/v1 -fno-omit-frame-pointer -fno-optimize-sibling-calls -O1 -glldb -DHAVE_GCC_ABI_DEMANGLE=no" \
+    LDFLAGS="-fsanitize=memory -fsanitize-memory-track-origins=2 $LDFLAGS -Wl,-rpath,/opt/libcxx10_msan/lib -L/opt/libcxx10_msan/lib -lc++abi" \
         /opt/get_symengine.sh 0179ce2f1b4cbcc8e0940555446d49f78c54f762 /opt/symengine-0179ce2-msan Debug -DWITH_CPP14=ON -DWITH_COTIRE=OFF -DWITH_BFD=OFF -DWITH_SYMENGINE_RCP=ON -DINTEGER_CLASS=boostmp \
         -DBOOST_ROOT=/opt/boost_1_73_p
 
@@ -56,10 +56,24 @@ RUN \
     apt-get --quiet --assume-yes --no-install-recommends install emacs auctex && \
     apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
+RUN \
+    mkdir -p /tmp/cpy39/build && cd /tmp/cpy39 && \
+    curl -Ls https://www.github.com/python/cpython/archive/3.9.tar.gz | tar xz -C /tmp/cpy39 --strip-components=1 && \
+    cd /tmp/cpy39/build && \
+    CFLAGS="-O2" .././configure \
+      --prefix=/opt/cpython-3.9 \
+      --enable-loadable-sqlite-extensions \
+      --enable-shared \
+      --with-ensurepip=yes \
+      LDFLAGS=-Wl,-rpath=/opt/cpython-3.9/lib \
+      && \
+    make install && \
+    /opt/cpython-3.9/bin/python3 -c "import sqlite3, uuid, lzma, bz2" && \
+    cd /tmp; rm -r /tmp/cpy39
 
 # COPY scripts/get_sundials-5.3.0.sh /opt/
 # RUN \
-#     CC=clang-10 CFLAGS="-fsanitize=memory -fno-omit-frame-pointer -fno-optimize-sibling-calls -O1" /opt/get_sundials-5.3.0.sh 5.3.0 /opt/sundials-5.3.0-msan -DLAPACK_ENABLE=OFF -DKLU_ENABLE=OFF -DSUNDIALS_INDEX_SIZE=32 && \
+#     CC=clang-10 CFLAGS="-fsanitize=memory -fsanitize-memory-track-origins=2 -fno-omit-frame-pointer -fno-optimize-sibling-calls -O1" /opt/get_sundials-5.3.0.sh 5.3.0 /opt/sundials-5.3.0-msan -DLAPACK_ENABLE=OFF -DKLU_ENABLE=OFF -DSUNDIALS_INDEX_SIZE=32 && \
 #     CC=gcc-10 /opt/get_sundials-5.3.0.sh 5.3.0 /opt/sundials-5.3.0-klu-lapack -DLAPACK_ENABLE=ON -DKLU_ENABLE=ON -DKLU_INCLUDE_DIR=/usr/include/suitesparse -DKLU_LIBRARY_DIR=/usr/lib/x86_64-linux-gnu -DSUNDIALS_INDEX_SIZE=32 && \
 #     CC=gcc-10 /opt/get_sundials-5.3.0.sh 5.3.0 /opt/sundials-5.3.0-noklu-nolapack-extended-int64 -DLAPACK_ENABLE=OFF -DKLU_ENABLE=OFF -DSUNDIALS_PRECISION:STRING="extended" -DSUNDIALS_INDEX_SIZE=64 && \
 #     CC=gcc-10 /opt/get_sundials-5.3.0.sh 5.3.0 /opt/sundials-5.3.0-noklu-nolapack-single-int32 -DLAPACK_ENABLE=OFF -DKLU_ENABLE=OFF -DSUNDIALS_PRECISION:STRING="single" -DSUNDIALS_INDEX_SIZE=32
@@ -110,8 +124,8 @@ RUN \
 
 
 # RUN \
-#     curl -Ls "https://julialang-s3.julialang.org/bin/linux/x64/1.4/julia-1.4.0-linux-x86_64.tar.gz" | tar xz -C /opt && \
-#     PATH=/opt/julia-1.4.0/bin:$PATH julia -e 'using Pkg; \
+#     curl -Ls "https://julialang-s3.julialang.org/bin/linux/x64/1.5/julia-1.5.0-linux-x86_64.tar.gz" | tar xz -C /opt && \
+#     PATH=/opt/julia-1.5.0/bin:$PATH julia -e 'using Pkg; \
 #       Pkg.add("DifferentialEquations"); using DifferentialEquations; \
 #       pkg"add https://github.com/JuliaDiffEq/DiffEqTutorials.jl"; using DiffEqTutorials; \
 #       Pkg.add("IJulia"); using IJulia; \
@@ -120,7 +134,7 @@ RUN \
 #       Pkg.add("DiffEqBiological"); using DiffEqBiological; \
 #       Pkg.add("ODEInterfaceDiffEq"); using ODEInterfaceDiffEq;' && \
 #     cd /opt && git clone https://github.com/JuliaDiffEq/DiffEqTutorials.jl && \
-#     PATH=/opt/julia-1.4.0/bin:$PATH julia -e 'using Pkg, DiffEqTutorials; \
+#     PATH=/opt/julia-1.5.0/bin:$PATH julia -e 'using Pkg, DiffEqTutorials; \
 #       cd(joinpath(dirname(pathof(DiffEqTutorials)), "..")); \
 #       Pkg.pkg"activate ."; \
 #       Pkg.pkg"instantiate"; \
@@ -131,7 +145,7 @@ RUN \
 #       '
 
 # ~/.julia/conda/3/bin/pip install jupyter_contrib_nbextensions && \
-# PATH=/opt/julia-1.4.0/bin:$PATH julia -e 'using Pkg; \
+# PATH=/opt/julia-1.5.0/bin:$PATH julia -e 'using Pkg; \
 #   Pkg.add("WebIO"); using WebIO; \
 #   Pkg.add("ORCA"); using ORCA; \
 #   Pkg.add("PloylyJS"); using PlotlyJS; \
