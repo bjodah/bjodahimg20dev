@@ -53,14 +53,15 @@ RUN \
 
 RUN \
     apt-get update && apt-get dist-upgrade -y && \
-    apt-get --quiet --assume-yes --no-install-recommends install emacs auctex && \
+    apt-get --quiet --assume-yes --no-install-recommends install rr gcovr tmux libjson-c-dev libwebsockets-dev hunspell less texinfo && \
     apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
 RUN \
     mkdir -p /tmp/cpy39/build && cd /tmp/cpy39 && \
     curl -Ls https://www.github.com/python/cpython/archive/3.9.tar.gz | tar xz -C /tmp/cpy39 --strip-components=1 && \
+    cp -ra /tmp/cpy39 /tmp/cpy39-dbg && \
     cd /tmp/cpy39/build && \
-    CFLAGS="-O2" .././configure \
+    CC=gcc-10 CXX=g++-10 CFLAGS="-O2" .././configure \
       --prefix=/opt/cpython-3.9 \
       --enable-loadable-sqlite-extensions \
       --enable-shared \
@@ -69,7 +70,67 @@ RUN \
       && \
     make install && \
     /opt/cpython-3.9/bin/python3 -c "import sqlite3, uuid, lzma, bz2" && \
-    cd /tmp; rm -r /tmp/cpy39
+        cd /tmp; rm -r /tmp/cpy39
+
+#        && \
+#      CC=clang-10 CXX=clang++-10 CFLAGS="-Og -glldb -fsanitize=address -fno-omit-frame-pointer" .././configure \
+#      --with-address-sanitizer \
+#      --disable-ipv6 \
+# NPY_DISTUTILS_APPEND_FLAGS=1 LDFLAGS="-fsanitize=address"
+
+RUN \
+    cd /tmp/cpy39-dbg/build && \
+    CC=gcc-10 CXX=g++-10 CFLAGS="-Og -g -ggdb3" .././configure \
+      --without-pymalloc \
+      --with-valgrind \
+      --with-pydebug \
+      --verbose \
+      --prefix=/opt/cpython-3.9-dbg \
+      --enable-loadable-sqlite-extensions \
+      --enable-shared \
+      --with-ensurepip=yes \
+      LDFLAGS="-Wl,-rpath=/opt/cpython-3.9-dbg/lib" \
+      && \
+    make install && \
+    /opt/cpython-3.9-dbg/bin/python3 -c "import sqlite3, uuid, lzma, bz2" && \
+    /opt/cpython-3.9-dbg/bin/python3 -m pip install --upgrade --upgrade-strategy=eager pip && \
+    /opt/cpython-3.9-dbg/bin/python3 -m pip install --use-feature=2020-resolver cython pytest && \
+    /opt/cpython-3.9-dbg/bin/python3 -m pip install --use-feature=2020-resolver numpy && \
+    /opt/cpython-3.9-dbg/bin/python3 -m pip install --use-feature=2020-resolver scipy && \
+    cd /tmp; rm -rf /tmp/* /var/tmp/* ~/.cache/pip
+
+RUN \
+    apt-get update && apt-get dist-upgrade -y && \
+    apt-get --quiet --assume-yes --no-install-recommends install libmagick++-dev libgif-dev libgnutls28-dev libacl1-dev && \
+    apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+
+RUN \
+    cd /tmp && \
+        git clone --depth 1 --branch emacs-27 git://github.com/emacs-mirror/emacs && cd emacs && ./autogen.sh && \
+        CC=gcc-10 CXX=g++-10 ./configure --with-imagemagick --with-modules --prefix=/opt/emacs-27 && \
+        make && make install && cd /tmp && rm -r emacs
+
+RUN cd /tmp && \
+    git clone --depth=1 --recursive https://github.com/MaskRay/ccls && cd ccls && \
+    CC=gcc-10 CXX=g++-10 cmake -H. -BRelease -DCMAKE_BUILD_TYPE=Release \
+        -DCMAKE_PREFIX_PATH=$(llvm-config-10 --prefix) \
+        -DLLVM_INCLUDE_DIR=$(llvm-config-10 --includedir) \
+        -DLLVM_BUILD_INCLUDE_DIR=/usr/include/llvm-10/ && \
+    cmake --build Release && \
+    cmake --build Release --target install && \
+    cd /tmp && rm -r *
+
+RUN \
+    cd /tmp/ && \
+    git clone --depth=1 https://github.com/tsl0922/ttyd.git && \
+        cd ttyd && mkdir build && cd build && \
+        CC=gcc-10 CXX=g++-10 cmake .. && \
+        make && make install && \
+    cd /tmp && rm -r ttyd
+
+
+
+
 
 # COPY scripts/get_sundials-5.3.0.sh /opt/
 # RUN \
