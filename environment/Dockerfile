@@ -1,9 +1,35 @@
-FROM bjodah/bjodahimg20:v1.2
+FROM bjodah/bjodahimg20:2.0
 MAINTAINER Björn Dahlgren <bjodah@DELETEMEgmail.com>
 
+ENV RUSTUP_HOME=/usr/local/rustup \
+    CARGO_HOME=/usr/local/cargo \
+    PATH=/usr/local/cargo/bin:$PATH
+
+RUN set -eux; \
+    curl -LOs https://static.rust-lang.org/rustup/dist/x86_64-unknown-linux-gnu/rustup-init; \
+    chmod +x rustup-init; \
+    ./rustup-init -y --no-modify-path --default-toolchain stable; \
+    rm rustup-init; \
+    chmod -R a+w $RUSTUP_HOME $CARGO_HOME; \
+    rustup --version; \
+    cargo --version; \
+    rustc --version; \
+    rustup component add rustfmt
+
 RUN \
-    export CC=clang-10 CXX=clang++-10 && \
-    export LLVM_ORG_VER=10.0.1-rc1 && \
+    cd /tmp && \
+        git clone --depth 1 --branch emacs-27 git://github.com/emacs-mirror/emacs && cd emacs && ./autogen.sh && \
+        CC=gcc-10 CXX=g++-10 ./configure --with-imagemagick --with-modules  --prefix=/usr/local && \
+        make && make install && cd /tmp && rm -r emacs
+
+RUN \
+    curl -Ls https://github.com/emscripten-core/emsdk/archive/2.0.6.tar.gz | tar xz -C /opt && \
+    cd /opt/emsdk-2.0.6 && ./emsdk install 2.0.6 && \
+    ./emsdk activate 2.0.6 && ls -l /opt/emsdk-2.0.6/emsdk_env.sh
+
+RUN \
+    export CC=clang-11 CXX=clang++-11 && \
+    export LLVM_ORG_VER=11.0.0-rc6 && \
     export LLVM_MAJOR=$(echo $LLVM_ORG_VER | cut -f1 -d.) && \
     curl -Ls https://github.com/llvm/llvm-project/archive/llvmorg-${LLVM_ORG_VER}.tar.gz | tar xz -C /tmp && \
     mkdir /tmp/build_libcxx && \
@@ -23,25 +49,25 @@ RUN \
 COPY scripts/get_sundials.sh /opt/
 # -fsanitize-memory-track-origins=2
 RUN \
-    CC=clang-10 CFLAGS="-fsanitize=memory -fsanitize-memory-track-origins=2 -fno-omit-frame-pointer -fno-optimize-sibling-calls -O1" /opt/get_sundials.sh 5.3.0 /opt/sundials-5.3.0-msan -DLAPACK_ENABLE=OFF -DKLU_ENABLE=OFF -DSUNDIALS_INDEX_SIZE=32 && \
+    CC=clang-11 CFLAGS="-fsanitize=memory -fsanitize-memory-track-origins=2 -fno-omit-frame-pointer -fno-optimize-sibling-calls -O1" /opt/get_sundials.sh 5.4.0 /opt/sundials-5.4.0-msan -DLAPACK_ENABLE=OFF -DKLU_ENABLE=OFF -DSUNDIALS_INDEX_SIZE=32 && \
     rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
 COPY scripts/get_symengine.sh /opt/
 RUN \
-    CC=clang-10 CXX=clang++-10 CXXFLAGS="-std=c++14" \
-        /opt/get_symengine.sh 0179ce2f1b4cbcc8e0940555446d49f78c54f762 /opt/symengine-0179ce2-rel Release -DWITH_CPP14=ON -DWITH_COTIRE=OFF -DWITH_BFD=OFF -DWITH_LLVM=ON && \
-    CC=clang-10 CXX=clang++-10 CXXFLAGS="-std=c++14" \
-        /opt/get_symengine.sh 0179ce2f1b4cbcc8e0940555446d49f78c54f762 /opt/symengine-0179ce2-tcm Release -DWITH_CPP14=ON -DWITH_COTIRE=OFF -DWITH_BFD=OFF -DWITH_LLVM=ON -DWITH_TCMALLOC=ON && \
+    CC=clang-11 CXX=clang++-11 CXXFLAGS="-std=c++14" \
+        /opt/get_symengine.sh 9fc2716cab4a6d2d89a3f9d765a04ef1594c6bcf /opt/symengine-9fc2716-rel Release -DWITH_CPP14=ON -DWITH_COTIRE=OFF -DWITH_BFD=OFF -DWITH_LLVM=ON && \
+    CC=clang-11 CXX=clang++-11 CXXFLAGS="-std=c++14" \
+        /opt/get_symengine.sh 9fc2716cab4a6d2d89a3f9d765a04ef1594c6bcf /opt/symengine-9fc2716-tcm Release -DWITH_CPP14=ON -DWITH_COTIRE=OFF -DWITH_BFD=OFF -DWITH_LLVM=ON -DWITH_TCMALLOC=ON && \
     export CMAKE_PREFIX_PATH=/usr/lib/llvm-10 && \
-    export CPLUS_INCLUDE_PATH=/opt/boost_1_73_p/include && cd /tmp && \
+    export CPLUS_INCLUDE_PATH=/opt/boost_1_74_p/include && cd /tmp && \
     CC=gcc-10   CXX=g++-10 CXXFLAGS="-std=c++14 -D_GLIBCXX_DEBUG -D_GLIBCXX_DEBUG_PEDANTIC -fsized-deallocation" \
-        /opt/get_symengine.sh 0179ce2f1b4cbcc8e0940555446d49f78c54f762 /opt/symengine-0179ce2-dbg Debug   -DWITH_CPP14=ON -DWITH_COTIRE=OFF -DWITH_BFD=OFF -DWITH_LLVM=OFF -DINTEGER_CLASS=boostmp
+        /opt/get_symengine.sh 9fc2716cab4a6d2d89a3f9d765a04ef1594c6bcf /opt/symengine-9fc2716-dbg Debug   -DWITH_CPP14=ON -DWITH_COTIRE=OFF -DWITH_BFD=OFF -DWITH_LLVM=OFF -DINTEGER_CLASS=boostmp
 
-RUN CC=clang-10 CXX=clang++-10 \
-    CXXFLAGS="-std=c++14 $CXXFLAGS -fsanitize=memory -fsanitize-memory-track-origins=2 -stdlib=libc++ -I/opt/libcxx10_msan/include -I/opt/libcxx10_msan/include/c++/v1 -fno-omit-frame-pointer -fno-optimize-sibling-calls -O1 -glldb -DHAVE_GCC_ABI_DEMANGLE=no" \
-    LDFLAGS="-fsanitize=memory -fsanitize-memory-track-origins=2 $LDFLAGS -Wl,-rpath,/opt/libcxx10_msan/lib -L/opt/libcxx10_msan/lib -lc++abi" \
-        /opt/get_symengine.sh 0179ce2f1b4cbcc8e0940555446d49f78c54f762 /opt/symengine-0179ce2-msan Debug -DWITH_CPP14=ON -DWITH_COTIRE=OFF -DWITH_BFD=OFF -DWITH_SYMENGINE_RCP=ON -DINTEGER_CLASS=boostmp \
-        -DBOOST_ROOT=/opt/boost_1_73_p
+RUN CC=clang-11 CXX=clang++-11 \
+    CXXFLAGS="-std=c++14 $CXXFLAGS -fsanitize=memory -fsanitize-memory-track-origins=2 -stdlib=libc++ -I/opt/libcxx11_msan/include -I/opt/libcxx11_msan/include/c++/v1 -fno-omit-frame-pointer -fno-optimize-sibling-calls -O1 -glldb -DHAVE_GCC_ABI_DEMANGLE=no" \
+    LDFLAGS="-fsanitize=memory -fsanitize-memory-track-origins=2 $LDFLAGS -Wl,-rpath,/opt/libcxx11_msan/lib -L/opt/libcxx11_msan/lib -lc++abi" \
+        /opt/get_symengine.sh 9fc2716cab4a6d2d89a3f9d765a04ef1594c6bcf /opt/symengine-9fc2716-msan Debug -DWITH_CPP14=ON -DWITH_COTIRE=OFF -DWITH_BFD=OFF -DWITH_SYMENGINE_RCP=ON -DINTEGER_CLASS=boostmp \
+        -DBOOST_ROOT=/opt/boost_1_74_p
 
 RUN \
     curl -Ls "https://vorboss.dl.sourceforge.net/project/swig/swig/swig-4.0.1/swig-4.0.1.tar.gz" | tar xz && cd swig-* && CXX=g++-10 CC=gcc-10 ./configure && make && make install
@@ -51,34 +77,34 @@ RUN \
     strip --remove-section=.note.ABI-tag /usr/lib/x86_64-linux-gnu/libQt5Core.so.5 && echo stackoverflow.com/questions/54582864/ >/dev/null && \
     wkhtmltopdf --help >/dev/null
 
+
+RUN apt-get update && apt-get -y install --no-install-recommends libclang-11-dev && \
+    apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* && \
+    cd /tmp && \
+    git clone --depth=1 --recursive https://github.com/MaskRay/ccls && cd ccls && \
+        CC=clang-11 CXX=clang++-11 cmake -H. -BRelease \
+        -DCMAKE_INSTALL_PREFIX=/usr/local \
+        -DBUILD_SHARED_LIBS=ON \
+        -DCLANG_RESOURCE_DIR=$(clang-11 -print-resource-dir) \
+        && \
+    cmake --build Release && \
+    cmake --build Release --target install && \
+    cd /tmp && rm -r *
+        # -DCMAKE_BUILD_TYPE=Release \
+
 RUN \
-    apt-get update && apt-get dist-upgrade -y && \
-    apt-get --quiet --assume-yes --no-install-recommends install rr gcovr tmux libjson-c-dev libwebsockets-dev hunspell less texinfo && \
-    apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+    cd /tmp/ && \
+    git clone --depth=1 https://github.com/tsl0922/ttyd.git && \
+        cd ttyd && mkdir build && cd build && \
+        CC=gcc-10 CXX=g++-10 cmake .. && \
+        make && make install && \
+    cd /tmp && rm -r ttyd
+
 
 RUN \
     mkdir -p /tmp/cpy39/build && cd /tmp/cpy39 && \
     curl -Ls https://www.github.com/python/cpython/archive/3.9.tar.gz | tar xz -C /tmp/cpy39 --strip-components=1 && \
     cp -ra /tmp/cpy39 /tmp/cpy39-dbg && \
-    cd /tmp/cpy39/build && \
-    CC=gcc-10 CXX=g++-10 CFLAGS="-O2" .././configure \
-      --prefix=/opt/cpython-3.9 \
-      --enable-loadable-sqlite-extensions \
-      --enable-shared \
-      --with-ensurepip=yes \
-      LDFLAGS=-Wl,-rpath=/opt/cpython-3.9/lib \
-      && \
-    make install && \
-    /opt/cpython-3.9/bin/python3 -c "import sqlite3, uuid, lzma, bz2" && \
-        cd /tmp; rm -r /tmp/cpy39
-
-#        && \
-#      CC=clang-10 CXX=clang++-10 CFLAGS="-Og -glldb -fsanitize=address -fno-omit-frame-pointer" .././configure \
-#      --with-address-sanitizer \
-#      --disable-ipv6 \
-# NPY_DISTUTILS_APPEND_FLAGS=1 LDFLAGS="-fsanitize=address"
-
-RUN \
     cd /tmp/cpy39-dbg/build && \
     CC=gcc-10 CXX=g++-10 CFLAGS="-Og -g -ggdb3" .././configure \
       --without-pymalloc \
@@ -95,49 +121,48 @@ RUN \
     /opt/cpython-3.9-dbg/bin/python3 -c "import sqlite3, uuid, lzma, bz2" && \
     /opt/cpython-3.9-dbg/bin/python3 -m pip install --upgrade --upgrade-strategy=eager pip && \
     /opt/cpython-3.9-dbg/bin/python3 -m pip install --use-feature=2020-resolver cython pytest && \
-    /opt/cpython-3.9-dbg/bin/python3 -m pip install --use-feature=2020-resolver numpy && \
-    /opt/cpython-3.9-dbg/bin/python3 -m pip install --use-feature=2020-resolver scipy && \
+    /opt/cpython-3.9-dbg/bin/python3 -m pip install --use-feature=2020-resolver numpy scipy matplotlib plotly tqdm && \
     cd /tmp; rm -rf /tmp/* /var/tmp/* ~/.cache/pip
 
 RUN \
-    apt-get update && apt-get dist-upgrade -y && \
-    apt-get --quiet --assume-yes --no-install-recommends install libmagick++-dev libgif-dev libgnutls28-dev libacl1-dev && \
+    apt-key adv --fetch-keys https://adoptopenjdk.jfrog.io/adoptopenjdk/api/gpg/key/public && \
+    echo "deb https://adoptopenjdk.jfrog.io/adoptopenjdk/deb/ focal main" >>/etc/apt/sources.list && \
+    apt-get update && \
+    apt-get -y install --no-install-recommends adoptopenjdk-11-openj9 && \
+    java --version && \
     apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
-RUN \
-    cd /tmp && \
-        git clone --depth 1 --branch emacs-27 git://github.com/emacs-mirror/emacs && cd emacs && ./autogen.sh && \
-        CC=gcc-10 CXX=g++-10 ./configure --with-imagemagick --with-modules --prefix=/opt/emacs-27 && \
-        make && make install && cd /tmp && rm -r emacs
-
-RUN cd /tmp && \
-    git clone --depth=1 --recursive https://github.com/MaskRay/ccls && cd ccls && \
-    CC=gcc-10 CXX=g++-10 cmake -H. -BRelease -DCMAKE_BUILD_TYPE=Release \
-        -DCMAKE_PREFIX_PATH=$(llvm-config-10 --prefix) \
-        -DLLVM_INCLUDE_DIR=$(llvm-config-10 --includedir) \
-        -DLLVM_BUILD_INCLUDE_DIR=/usr/include/llvm-10/ && \
-    cmake --build Release && \
-    cmake --build Release --target install && \
-    cd /tmp && rm -r *
-
-RUN \
-    cd /tmp/ && \
-    git clone --depth=1 https://github.com/tsl0922/ttyd.git && \
-        cd ttyd && mkdir build && cd build && \
-        CC=gcc-10 CXX=g++-10 cmake .. && \
-        make && make install && \
-    cd /tmp && rm -r ttyd
-
-
-
-
-
-# COPY scripts/get_sundials-5.3.0.sh /opt/
 # RUN \
-#     CC=clang-10 CFLAGS="-fsanitize=memory -fsanitize-memory-track-origins=2 -fno-omit-frame-pointer -fno-optimize-sibling-calls -O1" /opt/get_sundials-5.3.0.sh 5.3.0 /opt/sundials-5.3.0-msan -DLAPACK_ENABLE=OFF -DKLU_ENABLE=OFF -DSUNDIALS_INDEX_SIZE=32 && \
-#     CC=gcc-10 /opt/get_sundials-5.3.0.sh 5.3.0 /opt/sundials-5.3.0-klu-lapack -DLAPACK_ENABLE=ON -DKLU_ENABLE=ON -DKLU_INCLUDE_DIR=/usr/include/suitesparse -DKLU_LIBRARY_DIR=/usr/lib/x86_64-linux-gnu -DSUNDIALS_INDEX_SIZE=32 && \
-#     CC=gcc-10 /opt/get_sundials-5.3.0.sh 5.3.0 /opt/sundials-5.3.0-noklu-nolapack-extended-int64 -DLAPACK_ENABLE=OFF -DKLU_ENABLE=OFF -DSUNDIALS_PRECISION:STRING="extended" -DSUNDIALS_INDEX_SIZE=64 && \
-#     CC=gcc-10 /opt/get_sundials-5.3.0.sh 5.3.0 /opt/sundials-5.3.0-noklu-nolapack-single-int32 -DLAPACK_ENABLE=OFF -DKLU_ENABLE=OFF -DSUNDIALS_PRECISION:STRING="single" -DSUNDIALS_INDEX_SIZE=32
+#     mkdir -p /tmp/cpy310/build && cd /tmp/cpy310 && \
+#     curl -Ls https://www.github.com/python/cpython/archive/3.10.tar.gz | tar xz -C /tmp/cpy310 --strip-components=1 && \
+#     cp -ra /tmp/cpy310 /tmp/cpy310-dbg && \
+#     cd /tmp/cpy310/build && \
+#     CC=gcc-10 CXX=g++-10 CFLAGS="-O2" .././configure \
+#       --prefix=/opt/cpython-3.10 \
+#       --enable-loadable-sqlite-extensions \
+#       --enable-shared \
+#       --with-ensurepip=yes \
+#       LDFLAGS=-Wl,-rpath=/opt/cpython-3.10/lib \
+#       && \
+#     make install && \
+#     /opt/cpython-3.10/bin/python3 -c "import sqlite3, uuid, lzma, bz2" && \
+#     /opt/cpython-3.10/bin/python3 -m pip install --upgrade-strategy=eager --upgrade pip setuptools wheel && \
+#         cd /tmp; rm -r /tmp/cpy310
+
+#        && \
+#      CC=clang-11 CXX=clang++-11 CFLAGS="-Og -glldb -fsanitize=address -fno-omit-frame-pointer" .././configure \
+#      --with-address-sanitizer \
+#      --disable-ipv6 \
+# NPY_DISTUTILS_APPEND_FLAGS=1 LDFLAGS="-fsanitize=address"
+
+
+
+# COPY scripts/get_sundials-5.4.0.sh /opt/
+# RUN \
+#     CC=clang-11 CFLAGS="-fsanitize=memory -fsanitize-memory-track-origins=2 -fno-omit-frame-pointer -fno-optimize-sibling-calls -O1" /opt/get_sundials-5.4.0.sh 5.4.0 /opt/sundials-5.4.0-msan -DLAPACK_ENABLE=OFF -DKLU_ENABLE=OFF -DSUNDIALS_INDEX_SIZE=32 && \
+#     CC=gcc-10 /opt/get_sundials-5.4.0.sh 5.4.0 /opt/sundials-5.4.0-klu-lapack -DLAPACK_ENABLE=ON -DKLU_ENABLE=ON -DKLU_INCLUDE_DIR=/usr/include/suitesparse -DKLU_LIBRARY_DIR=/usr/lib/x86_64-linux-gnu -DSUNDIALS_INDEX_SIZE=32 && \
+#     CC=gcc-10 /opt/get_sundials-5.4.0.sh 5.4.0 /opt/sundials-5.4.0-noklu-nolapack-extended-int64 -DLAPACK_ENABLE=OFF -DKLU_ENABLE=OFF -DSUNDIALS_PRECISION:STRING="extended" -DSUNDIALS_INDEX_SIZE=64 && \
+#     CC=gcc-10 /opt/get_sundials-5.4.0.sh 5.4.0 /opt/sundials-5.4.0-noklu-nolapack-single-int32 -DLAPACK_ENABLE=OFF -DKLU_ENABLE=OFF -DSUNDIALS_PRECISION:STRING="single" -DSUNDIALS_INDEX_SIZE=32
 
 # RUN \
 #     apt-get update && apt-get dist-upgrade -y && \
@@ -168,7 +193,7 @@ RUN \
 
 # tar xzf v3.8.2.tar.gz && \
 # cd cpython-3.8.2 && \
-# CC=clang-10 CFLAGS="-Og" ./configure --prefix=/opt/cpython-3.8m-msan --enable-loadable-sqlite-extensions --with-memory-sanitizer --enable-shared --with-ensurepip=yes LDFLAGS=-Wl,-rpath=/opt/cpython-3.8-msan/lib && \
+# CC=clang-11 CFLAGS="-Og" ./configure --prefix=/opt/cpython-3.8m-msan --enable-loadable-sqlite-extensions --with-memory-sanitizer --enable-shared --with-ensurepip=yes LDFLAGS=-Wl,-rpath=/opt/cpython-3.8-msan/lib && \
     
 
 
@@ -177,11 +202,6 @@ RUN \
 #     PATH=/opt/julia-1.4.0/bin:$PATH python3 -c 'import diffeqpy; diffeqpy.install()' && \
 #     PATH=/opt/julia-1.4.0/bin:$PATH python3 -m pytest --pyargs diffeqpy && \
 #     rm -rf /tmp/* /var/tmp/* ~/.cache/pip
-
-# RUN \
-#     apt-get update && \
-#     apt-get --quiet --assume-yes --no-install-recommends install inkscape ninja-build && \
-#     apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
 
 # RUN \
